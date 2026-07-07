@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cacti RRD Dashboard & API Portal</title>
+    <!-- Google Fonts Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --bg-base: #0b0c10;
+            --bg-surface: #171923;
+            --bg-card: #202430;
+            --bg-elevated: #2d3142;
+            
+            --text-primary: #f7fafc;
+            --text-secondary: #a0aec0;
+            --text-muted: #718096;
+            
+            --accent-primary: #38a169;
+            --accent-primary-hover: #48bb78;
+            --accent-glow: rgba(56, 161, 105, 0.15);
+            
+            --border-color: rgba(255, 255, 255, 0.08);
+            --transition-smooth: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-base);
+            color: var(--text-primary);
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            overflow: hidden;
+        }
+
+        /* Layout Structure */
+        .sidebar {
+            width: 320px;
+            background-color: var(--bg-surface);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            z-index: 10;
+        }
+
+        .main-content {
+            flex: 1;
+            height: 100vh;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            background: radial-gradient(circle at 50% 0%, rgba(56, 161, 105, 0.08), transparent 70%);
+        }
+
+        /* Sidebar Elements */
+        .sidebar-header {
+            padding: 24px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .sidebar-title {
+            font-size: 18px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .sidebar-title span {
+            background: linear-gradient(135deg, #48bb78, #38b2ac);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .sidebar-subtitle {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-top: 4px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .search-container {
+            padding: 16px 24px;
+            position: relative;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 12px 16px 12px 40px;
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 14px;
+            outline: none;
+            transition: var(--transition-smooth);
+        }
+
+        .search-input:focus {
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 0 3px var(--accent-glow);
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 36px;
+            top: 28px;
+            width: 16px;
+            height: 16px;
+            fill: var(--text-muted);
+        }
+
+        .metrics-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 0 16px 24px 16px;
+        }
+
+        .metric-item {
+            display: block;
+            width: 100%;
+            padding: 12px 16px;
+            margin-bottom: 8px;
+            background-color: transparent;
+            border: 1px solid transparent;
+            border-radius: 8px;
+            text-align: left;
+            cursor: pointer;
+            transition: var(--transition-smooth);
+        }
+
+        .metric-item:hover {
+            background-color: rgba(255, 255, 255, 0.03);
+            border-color: var(--border-color);
+        }
+
+        .metric-item.active {
+            background-color: rgba(56, 161, 105, 0.1);
+            border-color: rgba(56, 161, 105, 0.3);
+        }
+
+        .metric-name {
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-primary);
+            word-break: break-all;
+        }
+
+        .metric-ds {
+            font-size: 11px;
+            color: var(--accent-primary);
+            margin-top: 4px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* Main Dashboard Elements */
+        .dashboard-header {
+            padding: 24px 40px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background-color: rgba(23, 25, 35, 0.4);
+            backdrop-filter: blur(8px);
+        }
+
+        .active-metric-info {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .active-metric-title {
+            font-size: 20px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+        }
+
+        .active-metric-details {
+            font-size: 13px;
+            color: var(--text-secondary);
+            margin-top: 4px;
+        }
+
+        .timeframe-selector {
+            display: flex;
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            padding: 4px;
+            border-radius: 8px;
+            gap: 4px;
+        }
+
+        .timeframe-btn {
+            background: none;
+            border: none;
+            padding: 8px 16px;
+            color: var(--text-secondary);
+            font-size: 13px;
+            font-weight: 500;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: var(--transition-smooth);
+        }
+
+        .timeframe-btn:hover {
+            color: var(--text-primary);
+            background-color: rgba(255, 255, 255, 0.03);
+        }
+
+        .timeframe-btn.active {
+            color: var(--text-primary);
+            background-color: var(--accent-primary);
+        }
+
+        .dashboard-grid {
+            padding: 40px;
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 32px;
+            max-width: 1200px;
+            width: 100%;
+            margin: 0 auto;
+        }
+
+        .card {
+            background-color: var(--bg-surface);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.25);
+            transition: var(--transition-smooth);
+        }
+
+        .card-title {
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .card-title::before {
+            content: '';
+            display: inline-block;
+            width: 4px;
+            height: 16px;
+            background-color: var(--accent-primary);
+            border-radius: 2px;
+        }
+
+        /* Chart Area */
+        .chart-container {
+            width: 100%;
+            min-height: 350px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: var(--bg-base);
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            overflow: hidden;
+            position: relative;
+        }
+
+        .chart-svg {
+            width: 100%;
+            height: 100%;
+            max-height: 400px;
+        }
+
+        .spinner {
+            border: 3px solid rgba(255, 255, 255, 0.05);
+            border-radius: 50%;
+            border-top: 3px solid var(--accent-primary);
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            position: absolute;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Data Table Style */
+        .table-responsive {
+            width: 100%;
+            max-height: 300px;
+            overflow-y: auto;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+            text-align: left;
+        }
+
+        th {
+            background-color: var(--bg-card);
+            color: var(--text-secondary);
+            font-weight: 600;
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border-color);
+            position: sticky;
+            top: 0;
+            z-index: 1;
+        }
+
+        td {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border-color);
+            color: var(--text-primary);
+        }
+
+        tr:hover td {
+            background-color: rgba(255, 255, 255, 0.01);
+        }
+
+        /* Integration Section */
+        .integration-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+        }
+
+        .code-block {
+            background-color: var(--bg-base);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 16px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            color: #e2e8f0;
+            overflow-x: auto;
+            line-height: 1.6;
+        }
+
+        .instructions-list {
+            margin-left: 20px;
+            color: var(--text-secondary);
+            font-size: 14px;
+            line-height: 1.8;
+        }
+
+        .instructions-list li {
+            margin-bottom: 8px;
+        }
+
+        .badge {
+            background-color: rgba(56, 161, 105, 0.15);
+            color: var(--accent-primary);
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            border: 1px solid rgba(56, 161, 105, 0.2);
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .no-data {
+            color: var(--text-muted);
+            text-align: center;
+            padding: 40px;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Sidebar for Metrics Selection -->
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <div class="sidebar-title">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="stroke: #38a169; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round;">
+                    <path d="M3 3v18h18"></path>
+                    <path d="M18.7 8l-5.1 5.2-2.8-2.7L7 14.3"></path>
+                </svg>
+                <span>Cacti RRD Portal</span>
+            </div>
+            <div class="sidebar-subtitle">Version 1.2.30 API Bridge</div>
+        </div>
+        
+        <div class="search-container">
+            <svg class="search-icon" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" />
+            </svg>
+            <input type="text" id="metricSearch" class="search-input" placeholder="Search metrics...">
+        </div>
+        
+        <div class="metrics-list" id="metricsList">
+            <div class="no-data">Loading metrics...</div>
+        </div>
+    </div>
+
+    <!-- Main Content Area -->
+    <div class="main-content">
+        <div class="dashboard-header">
+            <div class="active-metric-info">
+                <h1 class="active-metric-title" id="activeMetricTitle">Select a Metric</h1>
+                <div class="active-metric-details" id="activeMetricDetails">Choose an RRD source from the sidebar to visualize.</div>
+            </div>
+            
+            <div class="timeframe-selector">
+                <button class="timeframe-btn active" data-range="-1h">1H</button>
+                <button class="timeframe-btn" data-range="-4h">4H</button>
+                <button class="timeframe-btn" data-range="-24h">24H</button>
+                <button class="timeframe-btn" data-range="-7d">7D</button>
+            </div>
+        </div>
+        
+        <div class="dashboard-grid">
+            <!-- Chart Visualizer -->
+            <div class="card">
+                <div class="card-title">Live Visualization</div>
+                <div class="chart-container" id="chartContainer">
+                    <div class="no-data">No metric selected</div>
+                </div>
+            </div>
+            
+            <!-- Table & Details Split -->
+            <div class="integration-grid">
+                <!-- Raw Data Table -->
+                <div class="card" style="display: flex; flex-direction: column;">
+                    <div class="card-title">Time-series Raw Data</div>
+                    <div class="table-responsive" style="flex: 1;">
+                        <table id="dataTable">
+                            <thead>
+                                <tr>
+                                    <th>Timestamp</th>
+                                    <th>Value</th>
+                                </tr>
+                            </thead>
+                            <tbody id="dataTableBody">
+                                <tr>
+                                    <td colspan="2" class="no-data">No data loaded</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <!-- Grafana & API Integration Info -->
+                <div class="card">
+                    <div class="card-title">Grafana Integration</div>
+                    <p style="font-size: 14px; color: var(--text-secondary); margin-bottom: 16px; line-height: 1.6;">
+                        This API is fully compatible with the <span class="badge">SimpleJSON</span> or <span class="badge">Infinity</span> data source plugins in Grafana.
+                    </p>
+                    
+                    <ol class="instructions-list" style="margin-bottom: 16px;">
+                        <li>Install <strong>JSON API</strong> or <strong>Infinity</strong> datasource in Grafana.</li>
+                        <li>Add new Datasource and set the URL to:
+                            <div class="code-block" style="margin: 8px 0;" id="grafanaUrl">http://your-server-ip:9191</div>
+                        </li>
+                        <li>Define query URL path as: <span class="badge">/api/v1/xport</span></li>
+                        <li>Configure headers or parameters if Basic Auth or HMAC signing is enabled.</li>
+                    </ol>
+                    
+                    <div class="code-block" style="font-size: 11px;">
+# API Signature Authentication Example (Go)
+# Query parameters are hashed using HMAC-SHA256
+key := []byte("your_secret")
+message := "/api/v1/xport?start=-1h&x=1751912400&"
+mac := hmac.New(sha256.New, key)
+mac.Write([]byte(message))
+signature := hex.EncodeToString(mac.Sum(nil))
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Client-Side Application Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const apiBase = window.location.origin;
+            document.getElementById('grafanaUrl').innerText = apiBase;
+
+            let allMetrics = [];
+            let activeMetric = ''; // format 'filename:ds'
+            let activeRange = '-1h';
+
+            const searchInput = document.getElementById('metricSearch');
+            const metricsList = document.getElementById('metricsList');
+            const activeTitle = document.getElementById('activeMetricTitle');
+            const activeDetails = document.getElementById('activeMetricDetails');
+            const chartContainer = document.getElementById('chartContainer');
+            const tableBody = document.getElementById('dataTableBody');
+
+            // Set up timeframe button clicks
+            document.querySelectorAll('.timeframe-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    document.querySelectorAll('.timeframe-btn').forEach(b => b.classList.remove('active'));
+                    e.target.classList.add('active');
+                    activeRange = e.target.getAttribute('data-range');
+                    if (activeMetric) {
+                        loadMetricData();
+                    }
+                });
+            });
+
+            // Fetch metrics list
+            async function fetchMetrics() {
+                try {
+                    const response = await fetch(`${apiBase}/api/v1/list_metrics`);
+                    if (!response.ok) throw new Error('Failed to fetch metrics');
+                    allMetrics = await response.json();
+                    renderMetricsList(allMetrics);
+                } catch (err) {
+                    metricsList.innerHTML = `<div class="no-data" style="color:#e53e3e">Error: ${err.message}</div>`;
+                }
+            }
+
+            // Render list items
+            function renderMetricsList(metrics) {
+                if (metrics.length === 0) {
+                    metricsList.innerHTML = '<div class="no-data">No metrics found</div>';
+                    return;
+                }
+                
+                metricsList.innerHTML = '';
+                metrics.forEach(metric => {
+                    const [file, ds] = metric.split(':');
+                    
+                    const button = document.createElement('button');
+                    button.className = 'metric-item';
+                    if (activeMetric === metric) button.classList.add('active');
+                    
+                    button.innerHTML = `
+                        <div class="metric-name" title="${file}">${file}</div>
+                        <div class="metric-ds">DS: ${ds}</div>
+                    `;
+                    
+                    button.addEventListener('click', () => {
+                        activeMetric = metric;
+                        document.querySelectorAll('.metric-item').forEach(b => b.classList.remove('active'));
+                        button.classList.add('active');
+                        
+                        // Update headers
+                        activeTitle.innerText = file;
+                        activeDetails.innerText = `Data Source: ${ds} | Interval: 300s`;
+                        
+                        loadMetricData();
+                    });
+                    
+                    metricsList.appendChild(button);
+                });
+            }
+
+            // Search filtering
+            searchInput.addEventListener('input', (e) => {
+                const query = e.target.value.toLowerCase();
+                const filtered = allMetrics.filter(m => m.toLowerCase().includes(query));
+                renderMetricsList(filtered);
+            });
+
+            // Load visual and tabular data for selected metric
+            async function loadMetricData() {
+                if (!activeMetric) return;
+                
+                const [file, ds] = activeMetric.split(':');
+                
+                // Show loaders
+                chartContainer.innerHTML = '<div class="spinner"></div>';
+                tableBody.innerHTML = '<tr><td colspan="2" class="no-data">Loading values...</td></tr>';
+                
+                // 1. Load Chart SVG
+                try {
+                    const graphSpec = `DEF:val=${file}:${ds}:AVERAGE LINE1.5:val#38a169:${ds}`;
+                    const chartUrl = `${apiBase}/api/v1/graph?start=${activeRange}&imgformat=SVG&graph=${encodeURIComponent(graphSpec)}&title=${encodeURIComponent(file + ' (' + ds + ')')}`;
+                    
+                    const chartResponse = await fetch(chartUrl);
+                    if (!chartResponse.ok) {
+                        const errText = await chartResponse.text();
+                        throw new Error(errText || 'Graph render failed');
+                    }
+                    const svgText = await chartResponse.text();
+                    chartContainer.innerHTML = svgText;
+                } catch (err) {
+                    chartContainer.innerHTML = `<div class="no-data" style="color:#e53e3e; padding: 20px; text-align: center;">Error rendering graph: ${err.message}</div>`;
+                }
+
+                // 2. Load Raw Tabular Data (xport)
+                try {
+                    const xportSpec = `DEF:val=${file}:${ds}:AVERAGE XPORT:val:${ds}`;
+                    const xportUrl = `${apiBase}/api/v1/xport?start=${activeRange}&xport=${encodeURIComponent(xportSpec)}`;
+                    
+                    const xportResponse = await fetch(xportUrl);
+                    if (!xportResponse.ok) {
+                        const errText = await xportResponse.text();
+                        throw new Error(errText || 'Data export failed');
+                    }
+                    const data = await xportResponse.json();
+                    
+                    renderTable(data);
+                } catch (err) {
+                    tableBody.innerHTML = `<tr><td colspan="2" class="no-data" style="color:#e53e3e">Error: ${err.message}</td></tr>`;
+                }
+            }
+
+            // Render raw values inside table
+            function renderTable(xportData) {
+                if (!xportData || !xportData.data || xportData.data.length === 0) {
+                    tableBody.innerHTML = '<tr><td colspan="2" class="no-data">No data points available</td></tr>';
+                    return;
+                }
+
+                tableBody.innerHTML = '';
+                
+                // Show last 100 rows to prevent DOM performance issues
+                const displayRows = xportData.data.slice(-100).reverse();
+                
+                displayRows.forEach(row => {
+                    const timestamp = new Date(row[0] * 1000).toLocaleString();
+                    const value = row[1][0];
+                    const valText = (value === null || isNaN(value)) ? '<span style="color:var(--text-muted)">NaN</span>' : value.toFixed(4);
+                    
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${timestamp}</td>
+                        <td style="font-family:'JetBrains Mono',monospace;">${valText}</td>
+                    `;
+                    tableBody.appendChild(tr);
+                });
+            }
+
+            // Run initial load
+            fetchMetrics();
+        });
+    </script>
+</body>
+</html>
