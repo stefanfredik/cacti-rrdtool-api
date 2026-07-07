@@ -12,6 +12,7 @@ func TestLoadConfigDefaults(t *testing.T) {
 		"RRD_LISTEN_ADDRESS", "RRD_DIR", "RRDTOOL_COMMAND",
 		"RRD_SIGNED_QUERY_SECRET", "RRD_BASIC_AUTH_USER",
 		"RRD_BASIC_AUTH_PASS", "RRD_REFRESH_INTERVAL", "RRD_DEMO_MODE",
+		"RRD_DB_HOST", "RRD_DB_USER", "RRD_DB_PASS", "RRD_DB_NAME", "RRD_DB_PORT",
 	}
 	for _, env := range envVars {
 		os.Unsetenv(env)
@@ -33,6 +34,18 @@ func TestLoadConfigDefaults(t *testing.T) {
 	}
 	if cfg.RefreshInterval != 5*time.Minute {
 		t.Errorf("Expected default refresh interval 5m, got %s", cfg.RefreshInterval)
+	}
+	if cfg.DBHost != "localhost" {
+		t.Errorf("Expected default DB host localhost, got %s", cfg.DBHost)
+	}
+	if cfg.DBUser != "cactiuser" {
+		t.Errorf("Expected default DB user cactiuser, got %s", cfg.DBUser)
+	}
+	if cfg.DBPass != "tbaCxdkYFcwEx2Sh" {
+		t.Errorf("Expected default DB pass tbaCxdkYFcwEx2Sh, got %s", cfg.DBPass)
+	}
+	if cfg.DBName != "cacti" {
+		t.Errorf("Expected default DB name cacti, got %s", cfg.DBName)
 	}
 }
 

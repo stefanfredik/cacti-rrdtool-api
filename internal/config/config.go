@@ -44,11 +44,11 @@ func LoadConfig(args []string) (*Config, error) {
 		RateLimitRPS:         20.0,
 		RateLimitBurst:       50,
 		MaxConcurrentRRDTool: 10,
-		DBHost:               "",
+		DBHost:               "localhost",
 		DBPort:               "3306",
-		DBUser:               "",
-		DBPass:               "",
-		DBName:               "",
+		DBUser:               "cactiuser",
+		DBPass:               "tbaCxdkYFcwEx2Sh",
+		DBName:               "cacti",
 	}
 
 	// CLI Flags using a local FlagSet to avoid global redefinition panics in tests
