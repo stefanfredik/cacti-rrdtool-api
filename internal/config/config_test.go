@@ -22,8 +22,8 @@ func TestLoadConfigDefaults(t *testing.T) {
 		t.Fatalf("Failed to load config: %v", err)
 	}
 
-	if cfg.ListenAddress != "0.0.0.0:9191" {
-		t.Errorf("Expected default listen address 0.0.0.0:9191, got %s", cfg.ListenAddress)
+	if cfg.ListenAddress != "0.0.0.0:9292" {
+		t.Errorf("Expected default listen address 0.0.0.0:9292, got %s", cfg.ListenAddress)
 	}
 	if cfg.RRDDir != "/var/www/html/cacti/rra" {
 		t.Errorf("Expected default RRD dir /var/www/html/cacti/rra, got %s", cfg.RRDDir)

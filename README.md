@@ -62,7 +62,7 @@ go build -o cacti-rrd-api-server main.go
 ### Menjalankan Server secara Manual
 ```bash
 # Menjalankan dengan parameter kustom
-./cacti-rrd-api-server -listen :9191 -rrd-dir /var/www/html/cacti/rra -secret "your_secret_here"
+./cacti-rrd-api-server -listen :9292 -rrd-dir /var/www/html/cacti/rra -secret "your_secret_here"
 ```
 
 ---
@@ -73,7 +73,7 @@ Konfigurasi dapat diatur menggunakan **JSON File**, **Environment Variables (ENV
 
 | Fitur | Environment Variable | CLI Flag | Default | Deskripsi |
 | :--- | :--- | :--- | :--- | :--- |
-| **Address** | `RRD_LISTEN_ADDRESS` | `-listen` | `0.0.0.0:9191` | Alamat listen server API |
+| **Address** | `RRD_LISTEN_ADDRESS` | `-listen` | `0.0.0.0:9292` | Alamat listen server API |
 | **RRD Dir** | `RRD_DIR` | `-rrd-dir` | `/var/www/html/cacti/rra` | Path folder file `.rrd` |
 | **Command** | `RRDTOOL_COMMAND` | `-rrdtool-bin` | `rrdtool` | Path menuju file binary rrdtool |
 | **Secret Key** | `RRD_SIGNED_QUERY_SECRET`| `-secret` | `""` | Kunci HMAC untuk signed URL |
@@ -108,7 +108,7 @@ WorkingDirectory=/home/homenet/dev/cacti
 LimitNOFILE=65535
 
 # Konfigurasi via Environment Variables
-Environment=RRD_LISTEN_ADDRESS=127.0.0.1:9191
+Environment=RRD_LISTEN_ADDRESS=127.0.0.1:9292
 Environment=RRD_DIR=/var/www/html/cacti/rra
 Environment=RRDTOOL_COMMAND=/usr/bin/rrdtool
 Environment=RRD_SIGNED_QUERY_SECRET=5478b004f3f97a56a32b95a2c559fcf6bcfcd0e1712692839f32b3b4dea01ff9
@@ -165,7 +165,7 @@ server {
     location / {
         limit_req zone=cacti_api_limit burst=60 nodelay;
 
-        proxy_pass http://127.0.0.1:9191;
+        proxy_pass http://127.0.0.1:9292;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection 'upgrade';
@@ -214,6 +214,20 @@ Menghasilkan grafik visual (SVG/PNG) langsung dari data RRD.
     *   `graph`: Spesifikasi grafik (e.g., `DEF:val=localhost_mem_buffers_3.rrd:mem_buffers:AVERAGE LINE1.5:val#38a169`).
     *   `title`: Judul grafik.
 
+### 5. `GET /api/v1/graphs`
+Mengembalikan daftar seluruh grafik (graphs) yang terkonfigurasi di dalam database Cacti.
+*   **Response**: Array JSON berisi ID grafik, judul, dan spesifikasi kueri RRD-nya.
+
+### 6. `GET /api/v1/graphs/render`
+Merender gambar grafik (SVG/PNG) secara dinamis langsung menggunakan ID Grafik Cacti (tanpa perlu menyuplai kueri RRD secara manual).
+*   **Query Parameter**:
+    *   `id`: ID Grafik Cacti yang ingin digambar (wajib).
+    *   `start`, `end`, `step`, `imgformat` (opsional, sama seperti endpoint graph biasa).
+
+### 7. `GET /api/v1/trees`
+Mengembalikan struktur hierarki pohon grafik (Graph Trees) yang dikonfigurasi di Cacti (termasuk folder/header, host, dan grafik bersarang di bawahnya).
+*   **Response**: Objek pohon terstruktur lengkap dengan relasi anak-induk (parent-child).
+
 ---
 
 ## 📊 Integrasi Grafana
@@ -224,7 +238,7 @@ Untuk menampilkan data RRD Cacti ke Grafana, gunakan plugin **Infinity** atau **
     Buka Grafana dan instal plugin **JSON API** oleh Marcus Olsson.
 2.  **Tambahkan Data Source**:
     - Pilih **JSON API** sebagai tipe Data Source.
-    - Set **URL** ke alamat API server (e.g., `https://cacti-api.company.local` or `http://127.0.0.1:9191`).
+    - Set **URL** ke alamat API server (e.g., `https://cacti-api.company.local` or `http://127.0.0.1:9292`).
     - Jika Basic Auth diaktifkan, konfigurasikan username & password di bagian Authentication.
 3.  **Konfigurasikan Query di Panel Dashboard**:
     - Set **Path** ke `/api/v1/xport`.
@@ -268,5 +282,5 @@ Jika diaktifkan, Anda dapat memanggil endpoint `/api/v1/list_metrics?detail=true
 ]
 ```
 
-Dashboard bawaan server (browser di `http://127.0.0.1:9191`) akan otomatis mendeteksi konfigurasi ini dan menampilkan nama antarmuka yang ramah manusia pada daftar metrik di sidebar secara otomatis!
+Dashboard bawaan server (browser di `http://127.0.0.1:9292`) akan otomatis mendeteksi konfigurasi ini dan menampilkan nama antarmuka yang ramah manusia pada daftar metrik di sidebar secara otomatis!
 

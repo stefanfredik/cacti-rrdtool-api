@@ -35,7 +35,7 @@ type Config struct {
 // LoadConfig loads configuration from CLI arguments, environment variables, and optionally a JSON config file.
 func LoadConfig(args []string) (*Config, error) {
 	cfg := &Config{
-		ListenAddress:        "0.0.0.0:9191",
+		ListenAddress:        "0.0.0.0:9292",
 		RRDDir:               "/var/www/html/cacti/rra",
 		RRDToolCommand:       "rrdtool",
 		RRDToolTimeout:       30 * time.Second,

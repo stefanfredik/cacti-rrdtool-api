@@ -247,3 +247,84 @@ func TestGraphHandler(t *testing.T) {
 		t.Errorf("Expected body to contain SVG tags")
 	}
 }
+
+func TestGraphsListAndRenderByID(t *testing.T) {
+	cfg := &config.Config{}
+	router, _ := setupTestServer(cfg)
+
+	// 1. Test List Graphs
+	req := httptest.NewRequest("GET", "/api/v1/graphs", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("Expected status 200 OK, got %d. Error: %s", w.Code, w.Body.String())
+	}
+
+	var graphs []rrd.GraphDefinition
+	if err := json.Unmarshal(w.Body.Bytes(), &graphs); err != nil {
+		t.Fatalf("Failed to decode graphs list: %v", err)
+	}
+
+	// Should fall back to 3 mock graphs
+	if len(graphs) != 3 {
+		t.Errorf("Expected 3 fallback graphs, got %d", len(graphs))
+	}
+
+	// 2. Test Render Graph by ID
+	req = httptest.NewRequest("GET", "/api/v1/graphs/render?id=1&imgformat=SVG", nil)
+	w = httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("Expected status 200 OK, got %d. Error: %s", w.Code, w.Body.String())
+	}
+
+	if w.Header().Get("Content-Type") != "image/svg+xml" {
+		t.Errorf("Expected content type 'image/svg+xml', got %q", w.Header().Get("Content-Type"))
+	}
+
+	bodyStr := w.Body.String()
+	if !strings.Contains(bodyStr, "<svg") || !strings.Contains(bodyStr, "</svg>") {
+		t.Errorf("Expected body to contain SVG tags")
+	}
+
+	// 3. Test Render non-existent graph
+	req = httptest.NewRequest("GET", "/api/v1/graphs/render?id=99&imgformat=SVG", nil)
+	w = httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusNotFound {
+		t.Errorf("Expected status 404 Not Found for invalid graph ID, got %d", w.Code)
+	}
+}
+
+func TestListGraphTreesHandler(t *testing.T) {
+	cfg := &config.Config{}
+	router, _ := setupTestServer(cfg)
+
+	req := httptest.NewRequest("GET", "/api/v1/trees", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("Expected status 200 OK, got %d. Error: %s", w.Code, w.Body.String())
+	}
+
+	var trees []rrd.GraphTree
+	if err := json.Unmarshal(w.Body.Bytes(), &trees); err != nil {
+		t.Fatalf("Failed to decode graph trees response: %v", err)
+	}
+
+	if len(trees) != 1 {
+		t.Errorf("Expected 1 mock graph tree, got %d", len(trees))
+	}
+
+	if trees[0].Name != "Default Tree" {
+		t.Errorf("Expected mock tree name 'Default Tree', got %q", trees[0].Name)
+	}
+
+	if len(trees[0].Items) != 2 {
+		t.Errorf("Expected 2 items at root level of mock tree, got %d", len(trees[0].Items))
+	}
+}

@@ -4,7 +4,9 @@ import (
 	"cacti-rrd-api/internal/rrd"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/google/shlex"
@@ -299,4 +301,225 @@ func RestrictToMethods(methods ...string) func(http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 		})
 	}
+}
+
+// ListGraphsHandler returns all graphs defined in Cacti.
+func (h *APIHandler) ListGraphsHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.WriteHeader(http.StatusOK)
+
+	var graphs []rrd.GraphDefinition
+	var err error
+	if h.dbConn != nil {
+		graphs, err = h.dbConn.GetGraphs()
+		if err != nil {
+			log.Printf("Error fetching graphs from DB: %s", err)
+		}
+	}
+
+	// Fallback/Mock graphs for DemoMode or when DB is not configured/empty
+	if len(graphs) == 0 {
+		graphs = []rrd.GraphDefinition{
+			{
+				ID:    1,
+				Title: "Localhost - Traffic - eth0",
+				Specs: "DEF:in=localhost_traffic_in_4.rrd:traffic_in:AVERAGE DEF:out=localhost_traffic_in_4.rrd:traffic_out:AVERAGE AREA:in#00FF00:Inbound LINE1:out#0000FF:Outbound",
+			},
+			{
+				ID:    2,
+				Title: "Localhost - Memory Usage",
+				Specs: "DEF:buffers=localhost_mem_buffers_3.rrd:mem_buffers:AVERAGE AREA:buffers#38a169:Buffers",
+			},
+			{
+				ID:    3,
+				Title: "Localhost - CPU Usage - System",
+				Specs: "DEF:system=localhost_cpu_system_1.rrd:cpu_system:AVERAGE AREA:system#FF0000:System",
+			},
+		}
+	}
+
+	_ = json.NewEncoder(w).Encode(graphs)
+}
+
+// RenderGraphByIDHandler loads the graph specifications from DB and renders the graph.
+func (h *APIHandler) RenderGraphByIDHandler(w http.ResponseWriter, r *http.Request) {
+	queryParams := r.URL.Query()
+	idStr := queryParams.Get("id")
+	if idStr == "" {
+		http.Error(w, "missing graph id", http.StatusBadRequest)
+		return
+	}
+
+	graphID, err := strconv.Atoi(idStr)
+	if err != nil {
+		http.Error(w, "invalid graph id", http.StatusBadRequest)
+		return
+	}
+
+	var targetGraph *rrd.GraphDefinition
+	if h.dbConn != nil {
+		graphs, err := h.dbConn.GetGraphs()
+		if err == nil {
+			for _, g := range graphs {
+				if g.ID == graphID {
+					targetGraph = &g
+					break
+				}
+			}
+		}
+	}
+
+	// Mock graphs fallback
+	if targetGraph == nil {
+		mockGraphs := []rrd.GraphDefinition{
+			{
+				ID:    1,
+				Title: "Localhost - Traffic - eth0",
+				Specs: "DEF:in=localhost_traffic_in_4.rrd:traffic_in:AVERAGE DEF:out=localhost_traffic_in_4.rrd:traffic_out:AVERAGE AREA:in#00FF00:Inbound LINE1:out#0000FF:Outbound",
+			},
+			{
+				ID:    2,
+				Title: "Localhost - Memory Usage",
+				Specs: "DEF:buffers=localhost_mem_buffers_3.rrd:mem_buffers:AVERAGE AREA:buffers#38a169:Buffers",
+			},
+			{
+				ID:    3,
+				Title: "Localhost - CPU Usage - System",
+				Specs: "DEF:system=localhost_cpu_system_1.rrd:cpu_system:AVERAGE AREA:system#FF0000:System",
+			},
+		}
+		for _, g := range mockGraphs {
+			if g.ID == graphID {
+				targetGraph = &g
+				break
+			}
+		}
+	}
+
+	if targetGraph == nil {
+		http.Error(w, fmt.Sprintf("graph with id %d not found", graphID), http.StatusNotFound)
+		return
+	}
+
+	start := queryParams.Get("start")
+	end := queryParams.Get("end")
+	step := queryParams.Get("step")
+	imgFormat := queryParams.Get("imgformat")
+	if imgFormat == "" {
+		imgFormat = "SVG"
+	}
+	imgFormat = strings.ToUpper(imgFormat)
+
+	contentType, formatSupported := imgFormatToContentType[imgFormat]
+	if !formatSupported {
+		http.Error(w, fmt.Sprintf("graph api does not support the %q format", imgFormat), http.StatusBadRequest)
+		return
+	}
+
+	options := make(map[string]string)
+	options["title"] = targetGraph.Title
+
+	// Inherit other RRD options if specified in query
+	for k, vs := range queryParams {
+		if len(vs) == 0 {
+			continue
+		}
+		if _, exists := graphFlagToWantArg[k]; exists {
+			options[k] = vs[0]
+		}
+	}
+
+	specs, err := shlex.Split(targetGraph.Specs)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("unable to split graph specs: %s", err), http.StatusInternalServerError)
+		return
+	}
+
+	out, err := h.rrdClient.Graph(r.Context(), start, end, step, imgFormat, options, specs)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", contentType)
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(out)
+}
+
+// ListGraphTreesHandler returns the Cacti Graph Trees.
+func (h *APIHandler) ListGraphTreesHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.WriteHeader(http.StatusOK)
+
+	var trees []rrd.GraphTree
+	var err error
+	if h.dbConn != nil {
+		trees, err = h.dbConn.GetGraphTrees()
+		if err != nil {
+			log.Printf("Error fetching graph trees from DB: %s", err)
+		}
+	}
+
+	// Fallback/Mock tree for DemoMode or when DB is not configured/empty
+	if len(trees) == 0 {
+		trees = []rrd.GraphTree{
+			{
+				ID:   1,
+				Name: "Default Tree",
+				Items: []rrd.TreeItem{
+					{
+						ID:       1,
+						ParentID: 0,
+						Type:     "header",
+						Title:    "Local System",
+						Children: []rrd.TreeItem{
+							{
+								ID:           2,
+								ParentID:     1,
+								Type:         "graph",
+								Title:        "Localhost - Traffic - eth0",
+								LocalGraphID: 1,
+								Children:     []rrd.TreeItem{},
+							},
+							{
+								ID:           3,
+								ParentID:     1,
+								Type:         "graph",
+								Title:        "Localhost - Memory Usage",
+								LocalGraphID: 2,
+								Children:     []rrd.TreeItem{},
+							},
+						},
+					},
+					{
+						ID:       4,
+						ParentID: 0,
+						Type:     "header",
+						Title:    "External Servers",
+						Children: []rrd.TreeItem{
+							{
+								ID:       5,
+								ParentID: 4,
+								Type:     "host",
+								Title:    "Remote Server 1",
+								HostID:   2,
+								Children: []rrd.TreeItem{
+									{
+										ID:           0,
+										ParentID:     5,
+										Type:         "graph",
+										Title:        "Remote Server 1 - Traffic",
+										LocalGraphID: 1,
+										Children:     []rrd.TreeItem{},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+	}
+
+	_ = json.NewEncoder(w).Encode(trees)
 }

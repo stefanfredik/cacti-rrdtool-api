@@ -4,7 +4,7 @@ import time
 import requests
 
 SECRET = "5478b004f3f97a56a32b95a2c559fcf6bcfcd0e1712692839f32b3b4dea01ff9"
-BASE_URL = "http://127.0.0.1:9191"
+BASE_URL = "http://127.0.0.1:9292"
 ENDPOINT = "/api/v1/graph"
 
 # Mengatur kedaluwarsa token (contoh: berlaku untuk 5 menit ke depan)
