@@ -779,9 +779,9 @@ signature := hex.EncodeToString(mac.Sum(nil))
                 
                 // 1. Load Chart SVG
                 try {
-                    // Replace # with %23 so the browser doesn't interpret it as a URL fragment
-                    const colorEncoded = color.replace('#', '%23');
-                    const graphSpec = `DEF:val=${file}:${ds}:AVERAGE LINE1.5:val${colorEncoded}:${ds}`;
+                    // Use # directly — encodeURIComponent() below will encode it to %23 automatically,
+                    // and Go's URL parser will decode it back to # before the server processes it.
+                    const graphSpec = `DEF:val=${file}:${ds}:AVERAGE LINE1.5:val${color}:${ds}`;
                     const chartUrl = `${apiBase}/api/v1/graph?start=${activeRange}&imgformat=SVG&graph=${encodeURIComponent(graphSpec)}&title=${encodeURIComponent(file + ' (' + ds + ')')}`;
                     
                     const chartResponse = await fetch(chartUrl);
