@@ -25,8 +25,8 @@ func TestLoadConfigDefaults(t *testing.T) {
 	if cfg.ListenAddress != "0.0.0.0:9191" {
 		t.Errorf("Expected default listen address 0.0.0.0:9191, got %s", cfg.ListenAddress)
 	}
-	if cfg.RRDDir != "/var/lib/cacti/rra" {
-		t.Errorf("Expected default RRD dir /var/lib/cacti/rra, got %s", cfg.RRDDir)
+	if cfg.RRDDir != "/var/www/html/cacti/rra" {
+		t.Errorf("Expected default RRD dir /var/www/html/cacti/rra, got %s", cfg.RRDDir)
 	}
 	if cfg.RRDToolCommand != "rrdtool" {
 		t.Errorf("Expected default rrdtool bin rrdtool, got %s", cfg.RRDToolCommand)

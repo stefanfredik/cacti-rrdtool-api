@@ -31,7 +31,7 @@ type Config struct {
 func LoadConfig(args []string) (*Config, error) {
 	cfg := &Config{
 		ListenAddress:        "0.0.0.0:9191",
-		RRDDir:               "/var/lib/cacti/rra",
+		RRDDir:               "/var/www/html/cacti/rra",
 		RRDToolCommand:       "rrdtool",
 		RRDToolTimeout:       30 * time.Second,
 		RefreshInterval:      5 * time.Minute,

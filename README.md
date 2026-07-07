@@ -62,7 +62,7 @@ go build -o cacti-rrd-api-server main.go
 ### Menjalankan Server secara Manual
 ```bash
 # Menjalankan dengan parameter kustom
-./cacti-rrd-api-server -listen :9191 -rrd-dir /var/lib/cacti/rra -secret "your_secret_here"
+./cacti-rrd-api-server -listen :9191 -rrd-dir /var/www/html/cacti/rra -secret "your_secret_here"
 ```
 
 ---
@@ -74,7 +74,7 @@ Konfigurasi dapat diatur menggunakan **JSON File**, **Environment Variables (ENV
 | Fitur | Environment Variable | CLI Flag | Default | Deskripsi |
 | :--- | :--- | :--- | :--- | :--- |
 | **Address** | `RRD_LISTEN_ADDRESS` | `-listen` | `0.0.0.0:9191` | Alamat listen server API |
-| **RRD Dir** | `RRD_DIR` | `-rrd-dir` | `/var/lib/cacti/rra` | Path folder file `.rrd` |
+| **RRD Dir** | `RRD_DIR` | `-rrd-dir` | `/var/www/html/cacti/rra` | Path folder file `.rrd` |
 | **Command** | `RRDTOOL_COMMAND` | `-rrdtool-bin` | `rrdtool` | Path menuju file binary rrdtool |
 | **Secret Key** | `RRD_SIGNED_QUERY_SECRET`| `-secret` | `""` | Kunci HMAC untuk signed URL |
 | **Basic Auth User**| `RRD_BASIC_AUTH_USER` | `-auth-user` | `""` | Username untuk Basic Authentication |
@@ -109,7 +109,7 @@ LimitNOFILE=65535
 
 # Konfigurasi via Environment Variables
 Environment=RRD_LISTEN_ADDRESS=127.0.0.1:9191
-Environment=RRD_DIR=/var/lib/cacti/rra
+Environment=RRD_DIR=/var/www/html/cacti/rra
 Environment=RRDTOOL_COMMAND=/usr/bin/rrdtool
 Environment=RRD_SIGNED_QUERY_SECRET=5478b004f3f97a56a32b95a2c559fcf6bcfcd0e1712692839f32b3b4dea01ff9
 Environment=RRD_RATE_LIMIT_RPS=30
@@ -124,7 +124,7 @@ RestartSec=5s
 ProtectSystem=strict
 ProtectHome=true
 ReadWritePaths=/tmp
-ReadOnlyPaths=/var/lib/cacti/rra
+ReadOnlyPaths=/var/www/html/cacti/rra
 
 [Install]
 WantedBy=multi-user.target
