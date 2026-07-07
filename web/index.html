@@ -398,6 +398,58 @@
             padding: 40px;
             font-size: 14px;
         }
+
+        .sidebar-tab.active {
+            color: var(--text-primary) !important;
+            border-bottom-color: var(--accent-primary) !important;
+        }
+
+        /* Tree View Styling */
+        .tree-node {
+            margin-left: 10px;
+            border-left: 1px dashed rgba(255, 255, 255, 0.08);
+            padding-left: 10px;
+            margin-top: 4px;
+        }
+        
+        .tree-header {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            padding: 8px 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            border-radius: 6px;
+            transition: var(--transition-smooth);
+            user-select: none;
+        }
+        
+        .tree-header:hover {
+            background-color: rgba(255, 255, 255, 0.03);
+            color: var(--text-primary);
+        }
+        
+        .tree-toggle-icon {
+            font-size: 9px;
+            color: var(--accent-primary);
+            transition: transform 0.2s ease;
+            width: 10px;
+            text-align: center;
+        }
+        
+        .tree-toggle-icon.collapsed {
+            transform: rotate(-90deg);
+        }
+        
+        .tree-children {
+            transition: var(--transition-smooth);
+        }
+        
+        .tree-children.hidden {
+            display: none;
+        }
     </style>
 </head>
 <body>
@@ -414,12 +466,19 @@
             </div>
             <div class="sidebar-subtitle">Version 1.2.30 API Bridge</div>
         </div>
+
+        <!-- Tab selector in sidebar -->
+        <div class="sidebar-tabs" style="display: flex; border-bottom: 1px solid var(--border-color); background-color: rgba(255,255,255,0.01);">
+            <button class="sidebar-tab active" data-tab="metrics" style="flex: 1; padding: 12px; background: none; border: none; border-bottom: 2px solid var(--accent-primary); color: var(--text-primary); font-size: 10px; font-weight: 700; text-transform: uppercase; cursor: pointer; transition: var(--transition-smooth); outline: none;">Metrics</button>
+            <button class="sidebar-tab" data-tab="graphs" style="flex: 1; padding: 12px; background: none; border: none; border-bottom: 2px solid transparent; color: var(--text-secondary); font-size: 10px; font-weight: 700; text-transform: uppercase; cursor: pointer; transition: var(--transition-smooth); outline: none;">Graphs</button>
+            <button class="sidebar-tab" data-tab="trees" style="flex: 1; padding: 12px; background: none; border: none; border-bottom: 2px solid transparent; color: var(--text-secondary); font-size: 10px; font-weight: 700; text-transform: uppercase; cursor: pointer; transition: var(--transition-smooth); outline: none;">Trees</button>
+        </div>
         
         <div class="search-container">
             <svg class="search-icon" viewBox="0 0 20 20" fill="currentColor">
                 <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" />
             </svg>
-            <input type="text" id="metricSearch" class="search-input" placeholder="Search metrics...">
+            <input type="text" id="metricSearch" class="search-input" placeholder="Search...">
         </div>
         
         <div class="metrics-list" id="metricsList">
@@ -511,7 +570,14 @@ signature := hex.EncodeToString(mac.Sum(nil))
             document.getElementById('grafanaUrl').innerText = apiBase;
 
             let allMetrics = [];
+            let allGraphs = [];
+            let allTrees = [];
+            
+            let activeTab = 'metrics'; // 'metrics', 'graphs', 'trees'
             let activeMetric = ''; // format 'filename:ds'
+            let activeGraphID = null;
+            let activeGraphTitle = '';
+            
             let activeRange = '-1h';
 
             const searchInput = document.getElementById('metricSearch');
@@ -521,17 +587,67 @@ signature := hex.EncodeToString(mac.Sum(nil))
             const chartContainer = document.getElementById('chartContainer');
             const tableBody = document.getElementById('dataTableBody');
 
+            // Tab Switching Logic
+            document.querySelectorAll('.sidebar-tab').forEach(tabBtn => {
+                tabBtn.addEventListener('click', (e) => {
+                    document.querySelectorAll('.sidebar-tab').forEach(btn => {
+                        btn.classList.remove('active');
+                        btn.style.borderBottomColor = 'transparent';
+                        btn.style.color = 'var(--text-secondary)';
+                    });
+                    
+                    e.target.classList.add('active');
+                    e.target.style.borderBottomColor = 'var(--accent-primary)';
+                    e.target.style.color = 'var(--text-primary)';
+                    
+                    activeTab = e.target.getAttribute('data-tab');
+                    searchInput.value = ''; // clear search on tab switch
+                    
+                    refreshSidebarList();
+                });
+            });
+
             // Set up timeframe button clicks
             document.querySelectorAll('.timeframe-btn').forEach(btn => {
                 btn.addEventListener('click', (e) => {
                     document.querySelectorAll('.timeframe-btn').forEach(b => b.classList.remove('active'));
                     e.target.classList.add('active');
                     activeRange = e.target.getAttribute('data-range');
-                    if (activeMetric) {
-                        loadMetricData();
-                    }
+                    
+                    triggerDataRefresh();
                 });
             });
+
+            function triggerDataRefresh() {
+                if (activeTab === 'metrics' && activeMetric) {
+                    loadMetricData();
+                } else if ((activeTab === 'graphs' || activeTab === 'trees') && activeGraphID) {
+                    loadGraphByID(activeGraphID, activeGraphTitle);
+                }
+            }
+
+            function refreshSidebarList() {
+                if (activeTab === 'metrics') {
+                    renderMetricsList(allMetrics);
+                } else if (activeTab === 'graphs') {
+                    renderGraphsList(allGraphs);
+                } else if (activeTab === 'trees') {
+                    renderTreesList(allTrees);
+                }
+            }
+
+            // Fetch everything on initial load
+            async function initializeData() {
+                metricsList.innerHTML = '<div class="no-data">Loading metrics...</div>';
+                
+                await Promise.all([
+                    fetchMetrics(),
+                    fetchGraphs(),
+                    fetchTrees()
+                ]);
+                
+                refreshSidebarList();
+            }
 
             // Fetch metrics list
             async function fetchMetrics() {
@@ -539,13 +655,34 @@ signature := hex.EncodeToString(mac.Sum(nil))
                     const response = await fetch(`${apiBase}/api/v1/list_metrics?detail=true`);
                     if (!response.ok) throw new Error('Failed to fetch metrics');
                     allMetrics = await response.json();
-                    renderMetricsList(allMetrics);
                 } catch (err) {
-                    metricsList.innerHTML = `<div class="no-data" style="color:#e53e3e">Error: ${err.message}</div>`;
+                    console.error('Error fetching metrics:', err);
                 }
             }
 
-            // Render list items
+            // Fetch graphs list
+            async function fetchGraphs() {
+                try {
+                    const response = await fetch(`${apiBase}/api/v1/graphs`);
+                    if (!response.ok) throw new Error('Failed to fetch graphs');
+                    allGraphs = await response.json();
+                } catch (err) {
+                    console.error('Error fetching Cacti graphs:', err);
+                }
+            }
+
+            // Fetch Cacti trees list
+            async function fetchTrees() {
+                try {
+                    const response = await fetch(`${apiBase}/api/v1/trees`);
+                    if (!response.ok) throw new Error('Failed to fetch trees');
+                    allTrees = await response.json();
+                } catch (err) {
+                    console.error('Error fetching trees:', err);
+                }
+            }
+
+            // Render Metrics Tab
             function renderMetricsList(metrics) {
                 if (metrics.length === 0) {
                     metricsList.innerHTML = '<div class="no-data">No metrics found</div>';
@@ -561,7 +698,7 @@ signature := hex.EncodeToString(mac.Sum(nil))
                     
                     const button = document.createElement('button');
                     button.className = 'metric-item';
-                    if (activeMetric === metric) button.classList.add('active');
+                    if (activeTab === 'metrics' && activeMetric === metric) button.classList.add('active');
                     
                     button.innerHTML = `
                         <div class="metric-name" title="${title}">${title}</div>
@@ -573,7 +710,6 @@ signature := hex.EncodeToString(mac.Sum(nil))
                         document.querySelectorAll('.metric-item').forEach(b => b.classList.remove('active'));
                         button.classList.add('active');
                         
-                        // Update headers
                         activeTitle.innerText = title;
                         activeDetails.innerText = `File: ${file} | DS: ${ds} | Interval: 300s`;
                         
@@ -584,23 +720,173 @@ signature := hex.EncodeToString(mac.Sum(nil))
                 });
             }
 
+            // Render Saved Graphs Tab
+            function renderGraphsList(graphs) {
+                if (graphs.length === 0) {
+                    metricsList.innerHTML = '<div class="no-data">No saved Cacti graphs found</div>';
+                    return;
+                }
+                
+                metricsList.innerHTML = '';
+                graphs.forEach(g => {
+                    const button = document.createElement('button');
+                    button.className = 'metric-item';
+                    if ((activeTab === 'graphs' || activeTab === 'trees') && activeGraphID === g.id) {
+                        button.classList.add('active');
+                    }
+                    
+                    button.innerHTML = `
+                        <div class="metric-name" title="${g.title}">📊 ${g.title}</div>
+                        <div class="metric-ds" style="font-size:0.75rem; color:#a0aec0;">Graph ID: ${g.id}</div>
+                    `;
+                    
+                    button.addEventListener('click', () => {
+                        activeGraphID = g.id;
+                        activeGraphTitle = g.title;
+                        
+                        document.querySelectorAll('.metric-item').forEach(b => b.classList.remove('active'));
+                        button.classList.add('active');
+                        
+                        activeTitle.innerText = g.title;
+                        activeDetails.innerText = `Cacti Graph ID: ${g.id} (Rendered from DB Template)`;
+                        
+                        loadGraphByID(g.id, g.title);
+                    });
+                    
+                    metricsList.appendChild(button);
+                });
+            }
+
+            // Render Trees Tab
+            function renderTreesList(trees) {
+                if (trees.length === 0) {
+                    metricsList.innerHTML = '<div class="no-data">No Cacti graph trees found</div>';
+                    return;
+                }
+                
+                metricsList.innerHTML = '';
+                trees.forEach(tree => {
+                    const treeRoot = document.createElement('div');
+                    treeRoot.innerHTML = `
+                        <div class="tree-header">
+                            <span class="tree-toggle-icon">▼</span>
+                            <span>🌳 ${tree.name}</span>
+                        </div>
+                        <div class="tree-children"></div>
+                    `;
+                    const childrenContainer = treeRoot.querySelector('.tree-children');
+                    const toggle = treeRoot.querySelector('.tree-header');
+                    
+                    toggle.addEventListener('click', () => {
+                        const icon = toggle.querySelector('.tree-toggle-icon');
+                        icon.classList.toggle('collapsed');
+                        childrenContainer.classList.toggle('hidden');
+                    });
+                    
+                    renderTreeNodes(tree.items, childrenContainer);
+                    metricsList.appendChild(treeRoot);
+                });
+            }
+
+            function renderTreeNodes(items, container) {
+                if (!items) return;
+                items.forEach(item => {
+                    const node = document.createElement('div');
+                    node.className = 'tree-node';
+                    
+                    if (item.type === 'header') {
+                        node.innerHTML = `
+                            <div class="tree-header">
+                                <span class="tree-toggle-icon">▼</span>
+                                <span>📁 ${item.title}</span>
+                            </div>
+                            <div class="tree-children"></div>
+                        `;
+                        const childrenContainer = node.querySelector('.tree-children');
+                        const toggle = node.querySelector('.tree-header');
+                        toggle.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            const icon = toggle.querySelector('.tree-toggle-icon');
+                            icon.classList.toggle('collapsed');
+                            childrenContainer.classList.toggle('hidden');
+                        });
+                        renderTreeNodes(item.children, childrenContainer);
+                    } else if (item.type === 'host') {
+                        node.innerHTML = `
+                            <div class="tree-header">
+                                <span class="tree-toggle-icon">▼</span>
+                                <span>🖥️ ${item.title}</span>
+                            </div>
+                            <div class="tree-children"></div>
+                        `;
+                        const childrenContainer = node.querySelector('.tree-children');
+                        const toggle = node.querySelector('.tree-header');
+                        toggle.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            const icon = toggle.querySelector('.tree-toggle-icon');
+                            icon.classList.toggle('collapsed');
+                            childrenContainer.classList.toggle('hidden');
+                        });
+                        renderTreeNodes(item.children, childrenContainer);
+                    } else if (item.type === 'graph') {
+                        const btn = document.createElement('button');
+                        btn.className = 'metric-item';
+                        btn.style.width = 'calc(100% - 10px)';
+                        btn.style.margin = '4px 0 4px 10px';
+                        if (activeGraphID === item.local_graph_id) btn.classList.add('active');
+                        
+                        btn.innerHTML = `
+                            <div class="metric-name">📊 ${item.title}</div>
+                            <div class="metric-ds" style="font-size:0.75rem; color:#a0aec0;">Graph ID: ${item.local_graph_id}</div>
+                        `;
+                        
+                        btn.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            activeGraphID = item.local_graph_id;
+                            activeGraphTitle = item.title;
+                            
+                            document.querySelectorAll('.metric-item').forEach(b => b.classList.remove('active'));
+                            btn.classList.add('active');
+                            
+                            activeTitle.innerText = item.title;
+                            activeDetails.innerText = `Cacti Graph ID: ${item.local_graph_id} (Rendered from DB Template)`;
+                            
+                            loadGraphByID(item.local_graph_id, item.title);
+                        });
+                        node.appendChild(btn);
+                    }
+                    container.appendChild(node);
+                });
+            }
+
             // Search filtering
             searchInput.addEventListener('input', (e) => {
                 const query = e.target.value.toLowerCase();
-                const filtered = allMetrics.filter(item => 
-                    item.title.toLowerCase().includes(query) || 
-                    item.metric.toLowerCase().includes(query)
-                );
-                renderMetricsList(filtered);
+                if (activeTab === 'metrics') {
+                    const filtered = allMetrics.filter(item => 
+                        item.title.toLowerCase().includes(query) || 
+                        item.metric.toLowerCase().includes(query)
+                    );
+                    renderMetricsList(filtered);
+                } else if (activeTab === 'graphs') {
+                    const filtered = allGraphs.filter(item => 
+                        item.title.toLowerCase().includes(query)
+                    );
+                    renderGraphsList(filtered);
+                } else if (activeTab === 'trees') {
+                    const filtered = allTrees.filter(tree => 
+                        tree.name.toLowerCase().includes(query)
+                    );
+                    renderTreesList(filtered);
+                }
             });
 
-            // Load visual and tabular data for selected metric
+            // Load visual and tabular data for raw metric
             async function loadMetricData() {
                 if (!activeMetric) return;
                 
                 const [file, ds] = activeMetric.split(':');
                 
-                // Show loaders
                 chartContainer.innerHTML = '<div class="spinner"></div>';
                 tableBody.innerHTML = '<tr><td colspan="2" class="no-data">Loading values...</td></tr>';
                 
@@ -638,34 +924,108 @@ signature := hex.EncodeToString(mac.Sum(nil))
                 }
             }
 
-            // Render raw values inside table
+            // Load visual and tabular data for a graph by ID
+            async function loadGraphByID(graphID, title) {
+                if (!graphID) return;
+                
+                chartContainer.innerHTML = '<div class="spinner"></div>';
+                tableBody.innerHTML = '<tr><td colspan="2" class="no-data">Loading values...</td></tr>';
+                
+                // 1. Load Chart SVG
+                try {
+                    const chartUrl = `${apiBase}/api/v1/graphs/render?id=${graphID}&start=${activeRange}&imgformat=SVG`;
+                    const chartResponse = await fetch(chartUrl);
+                    if (!chartResponse.ok) {
+                        const errText = await chartResponse.text();
+                        throw new Error(errText || 'Graph render failed');
+                    }
+                    const svgText = await chartResponse.text();
+                    chartContainer.innerHTML = svgText;
+                } catch (err) {
+                    chartContainer.innerHTML = `<div class="no-data" style="color:#e53e3e; padding: 20px; text-align: center;">Error rendering graph: ${err.message}</div>`;
+                }
+
+                // 2. Load Raw Tabular Data (using resolved graph specs to query xport)
+                try {
+                    let targetGraph = allGraphs.find(g => g.id === graphID);
+                    if (targetGraph && targetGraph.specs) {
+                        const xportSpec = buildXportSpecFromGraphSpecs(targetGraph.specs);
+                        const xportUrl = `${apiBase}/api/v1/xport?start=${activeRange}&xport=${encodeURIComponent(xportSpec)}`;
+                        
+                        const xportResponse = await fetch(xportUrl);
+                        if (!xportResponse.ok) {
+                            const errText = await xportResponse.text();
+                            throw new Error(errText || 'Data export failed');
+                        }
+                        const data = await xportResponse.json();
+                        renderTable(data);
+                    } else {
+                        tableBody.innerHTML = '<tr><td colspan="2" class="no-data">No raw data spec available for this graph</td></tr>';
+                    }
+                } catch (err) {
+                    tableBody.innerHTML = `<tr><td colspan="2" class="no-data" style="color:#e53e3e">Error: ${err.message}</td></tr>`;
+                }
+            }
+
+            // Helper to translate compiled graph specs into a multi-variable xport query
+            function buildXportSpecFromGraphSpecs(specs) {
+                const parts = specs.split(' ');
+                const defs = parts.filter(p => p.startsWith('DEF:'));
+                const xports = defs.map(def => {
+                    const sub = def.substring(4); // remove "DEF:"
+                    const eqIndex = sub.indexOf('=');
+                    const vname = sub.substring(0, eqIndex);
+                    const remaining = sub.substring(eqIndex + 1);
+                    const remainingParts = remaining.split(':');
+                    const ds = remainingParts[1];
+                    return `XPORT:${vname}:${ds}`;
+                });
+                return [...defs, ...xports].join(' ');
+            }
+
+            // Render raw values inside table (multi-variable compatible)
             function renderTable(xportData) {
+                const tableHeader = document.querySelector('#dataTable thead');
                 if (!xportData || !xportData.data || xportData.data.length === 0) {
                     tableBody.innerHTML = '<tr><td colspan="2" class="no-data">No data points available</td></tr>';
                     return;
                 }
 
+                // Dynamic table headers based on columns
+                let headersHTML = '<tr><th>Timestamp</th>';
+                const legends = (xportData.meta && xportData.meta.legend) ? xportData.meta.legend : [];
+                if (legends.length > 0) {
+                    legends.forEach(leg => {
+                        headersHTML += `<th>${leg}</th>`;
+                    });
+                } else {
+                    headersHTML += '<th>Value</th>';
+                }
+                headersHTML += '</tr>';
+                tableHeader.innerHTML = headersHTML;
+
                 tableBody.innerHTML = '';
-                
-                // Show last 100 rows to prevent DOM performance issues
                 const displayRows = xportData.data.slice(-100).reverse();
                 
                 displayRows.forEach(row => {
                     const timestamp = new Date(row[0] * 1000).toLocaleString();
-                    const value = row[1][0];
-                    const valText = (value === null || isNaN(value)) ? '<span style="color:var(--text-muted)">NaN</span>' : value.toFixed(4);
+                    let rowHTML = `<tr><td>${timestamp}</td>`;
+                    
+                    const vals = row[1];
+                    vals.forEach(val => {
+                        const valText = (val === null || isNaN(val)) ? '<span style="color:var(--text-muted)">NaN</span>' : val.toFixed(4);
+                        rowHTML += `<td style="font-family:'JetBrains Mono',monospace;">${valText}</td>`;
+                    });
+                    rowHTML += '</tr>';
                     
                     const tr = document.createElement('tr');
-                    tr.innerHTML = `
-                        <td>${timestamp}</td>
-                        <td style="font-family:'JetBrains Mono',monospace;">${valText}</td>
-                    `;
+                    tr.innerHTML = rowHTML;
                     tableBody.appendChild(tr);
                 });
             }
 
             // Run initial load
-            fetchMetrics();
+            initializeData();
         });
     </script>
 </body>
