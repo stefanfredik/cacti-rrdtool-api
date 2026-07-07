@@ -26,7 +26,6 @@ func SetupRouter(cfg *config.Config, handler *APIHandler, frontendHandler http.H
 
 	mux.Handle("GET /api/v1/graphs", auth(http.HandlerFunc(handler.ListGraphsHandler)))
 	mux.Handle("GET /api/v1/graphs/render", auth(http.HandlerFunc(handler.RenderGraphByIDHandler)))
-	mux.Handle("GET /api/v1/trees", auth(http.HandlerFunc(handler.ListGraphTreesHandler)))
 
 	// Frontend route (serves embedded index.html)
 	if frontendHandler != nil {

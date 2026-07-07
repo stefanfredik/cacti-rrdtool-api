@@ -298,33 +298,3 @@ func TestGraphsListAndRenderByID(t *testing.T) {
 		t.Errorf("Expected status 404 Not Found for invalid graph ID, got %d", w.Code)
 	}
 }
-
-func TestListGraphTreesHandler(t *testing.T) {
-	cfg := &config.Config{}
-	router, _ := setupTestServer(cfg)
-
-	req := httptest.NewRequest("GET", "/api/v1/trees", nil)
-	w := httptest.NewRecorder()
-	router.ServeHTTP(w, req)
-
-	if w.Code != http.StatusOK {
-		t.Errorf("Expected status 200 OK, got %d. Error: %s", w.Code, w.Body.String())
-	}
-
-	var trees []rrd.GraphTree
-	if err := json.Unmarshal(w.Body.Bytes(), &trees); err != nil {
-		t.Fatalf("Failed to decode graph trees response: %v", err)
-	}
-
-	if len(trees) != 1 {
-		t.Errorf("Expected 1 mock graph tree, got %d", len(trees))
-	}
-
-	if trees[0].Name != "Default Tree" {
-		t.Errorf("Expected mock tree name 'Default Tree', got %q", trees[0].Name)
-	}
-
-	if len(trees[0].Items) != 2 {
-		t.Errorf("Expected 2 items at root level of mock tree, got %d", len(trees[0].Items))
-	}
-}

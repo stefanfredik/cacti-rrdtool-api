@@ -471,7 +471,6 @@
         <div class="sidebar-tabs" style="display: flex; border-bottom: 1px solid var(--border-color); background-color: rgba(255,255,255,0.01);">
             <button class="sidebar-tab active" data-tab="metrics" style="flex: 1; padding: 12px; background: none; border: none; border-bottom: 2px solid var(--accent-primary); color: var(--text-primary); font-size: 10px; font-weight: 700; text-transform: uppercase; cursor: pointer; transition: var(--transition-smooth); outline: none;">Metrics</button>
             <button class="sidebar-tab" data-tab="graphs" style="flex: 1; padding: 12px; background: none; border: none; border-bottom: 2px solid transparent; color: var(--text-secondary); font-size: 10px; font-weight: 700; text-transform: uppercase; cursor: pointer; transition: var(--transition-smooth); outline: none;">Graphs</button>
-            <button class="sidebar-tab" data-tab="trees" style="flex: 1; padding: 12px; background: none; border: none; border-bottom: 2px solid transparent; color: var(--text-secondary); font-size: 10px; font-weight: 700; text-transform: uppercase; cursor: pointer; transition: var(--transition-smooth); outline: none;">Trees</button>
         </div>
         
         <div class="search-container">
@@ -571,9 +570,8 @@ signature := hex.EncodeToString(mac.Sum(nil))
 
             let allMetrics = [];
             let allGraphs = [];
-            let allTrees = [];
             
-            let activeTab = 'metrics'; // 'metrics', 'graphs', 'trees'
+            let activeTab = 'metrics'; // 'metrics', 'graphs'
             let activeMetric = ''; // format 'filename:ds'
             let activeGraphID = null;
             let activeGraphTitle = '';
@@ -621,7 +619,7 @@ signature := hex.EncodeToString(mac.Sum(nil))
             function triggerDataRefresh() {
                 if (activeTab === 'metrics' && activeMetric) {
                     loadMetricData();
-                } else if ((activeTab === 'graphs' || activeTab === 'trees') && activeGraphID) {
+                } else if (activeTab === 'graphs' && activeGraphID) {
                     loadGraphByID(activeGraphID, activeGraphTitle);
                 }
             }
@@ -631,8 +629,6 @@ signature := hex.EncodeToString(mac.Sum(nil))
                     renderMetricsList(allMetrics);
                 } else if (activeTab === 'graphs') {
                     renderGraphsList(allGraphs);
-                } else if (activeTab === 'trees') {
-                    renderTreesList(allTrees);
                 }
             }
 
@@ -642,8 +638,7 @@ signature := hex.EncodeToString(mac.Sum(nil))
                 
                 await Promise.all([
                     fetchMetrics(),
-                    fetchGraphs(),
-                    fetchTrees()
+                    fetchGraphs()
                 ]);
                 
                 refreshSidebarList();
@@ -668,17 +663,6 @@ signature := hex.EncodeToString(mac.Sum(nil))
                     allGraphs = await response.json();
                 } catch (err) {
                     console.error('Error fetching Cacti graphs:', err);
-                }
-            }
-
-            // Fetch Cacti trees list
-            async function fetchTrees() {
-                try {
-                    const response = await fetch(`${apiBase}/api/v1/trees`);
-                    if (!response.ok) throw new Error('Failed to fetch trees');
-                    allTrees = await response.json();
-                } catch (err) {
-                    console.error('Error fetching trees:', err);
                 }
             }
 
@@ -731,7 +715,7 @@ signature := hex.EncodeToString(mac.Sum(nil))
                 graphs.forEach(g => {
                     const button = document.createElement('button');
                     button.className = 'metric-item';
-                    if ((activeTab === 'graphs' || activeTab === 'trees') && activeGraphID === g.id) {
+                    if (activeTab === 'graphs' && activeGraphID === g.id) {
                         button.classList.add('active');
                     }
                     
@@ -757,108 +741,6 @@ signature := hex.EncodeToString(mac.Sum(nil))
                 });
             }
 
-            // Render Trees Tab
-            function renderTreesList(trees) {
-                if (trees.length === 0) {
-                    metricsList.innerHTML = '<div class="no-data">No Cacti graph trees found</div>';
-                    return;
-                }
-                
-                metricsList.innerHTML = '';
-                trees.forEach(tree => {
-                    const treeRoot = document.createElement('div');
-                    treeRoot.innerHTML = `
-                        <div class="tree-header">
-                            <span class="tree-toggle-icon">▼</span>
-                            <span>🌳 ${tree.name}</span>
-                        </div>
-                        <div class="tree-children"></div>
-                    `;
-                    const childrenContainer = treeRoot.querySelector('.tree-children');
-                    const toggle = treeRoot.querySelector('.tree-header');
-                    
-                    toggle.addEventListener('click', () => {
-                        const icon = toggle.querySelector('.tree-toggle-icon');
-                        icon.classList.toggle('collapsed');
-                        childrenContainer.classList.toggle('hidden');
-                    });
-                    
-                    renderTreeNodes(tree.items, childrenContainer);
-                    metricsList.appendChild(treeRoot);
-                });
-            }
-
-            function renderTreeNodes(items, container) {
-                if (!items) return;
-                items.forEach(item => {
-                    const node = document.createElement('div');
-                    node.className = 'tree-node';
-                    
-                    if (item.type === 'header') {
-                        node.innerHTML = `
-                            <div class="tree-header">
-                                <span class="tree-toggle-icon">▼</span>
-                                <span>📁 ${item.title}</span>
-                            </div>
-                            <div class="tree-children"></div>
-                        `;
-                        const childrenContainer = node.querySelector('.tree-children');
-                        const toggle = node.querySelector('.tree-header');
-                        toggle.addEventListener('click', (e) => {
-                            e.stopPropagation();
-                            const icon = toggle.querySelector('.tree-toggle-icon');
-                            icon.classList.toggle('collapsed');
-                            childrenContainer.classList.toggle('hidden');
-                        });
-                        renderTreeNodes(item.children, childrenContainer);
-                    } else if (item.type === 'host') {
-                        node.innerHTML = `
-                            <div class="tree-header">
-                                <span class="tree-toggle-icon">▼</span>
-                                <span>🖥️ ${item.title}</span>
-                            </div>
-                            <div class="tree-children"></div>
-                        `;
-                        const childrenContainer = node.querySelector('.tree-children');
-                        const toggle = node.querySelector('.tree-header');
-                        toggle.addEventListener('click', (e) => {
-                            e.stopPropagation();
-                            const icon = toggle.querySelector('.tree-toggle-icon');
-                            icon.classList.toggle('collapsed');
-                            childrenContainer.classList.toggle('hidden');
-                        });
-                        renderTreeNodes(item.children, childrenContainer);
-                    } else if (item.type === 'graph') {
-                        const btn = document.createElement('button');
-                        btn.className = 'metric-item';
-                        btn.style.width = 'calc(100% - 10px)';
-                        btn.style.margin = '4px 0 4px 10px';
-                        if (activeGraphID === item.local_graph_id) btn.classList.add('active');
-                        
-                        btn.innerHTML = `
-                            <div class="metric-name">📊 ${item.title}</div>
-                            <div class="metric-ds" style="font-size:0.75rem; color:#a0aec0;">Graph ID: ${item.local_graph_id}</div>
-                        `;
-                        
-                        btn.addEventListener('click', (e) => {
-                            e.stopPropagation();
-                            activeGraphID = item.local_graph_id;
-                            activeGraphTitle = item.title;
-                            
-                            document.querySelectorAll('.metric-item').forEach(b => b.classList.remove('active'));
-                            btn.classList.add('active');
-                            
-                            activeTitle.innerText = item.title;
-                            activeDetails.innerText = `Cacti Graph ID: ${item.local_graph_id} (Rendered from DB Template)`;
-                            
-                            loadGraphByID(item.local_graph_id, item.title);
-                        });
-                        node.appendChild(btn);
-                    }
-                    container.appendChild(node);
-                });
-            }
-
             // Search filtering
             searchInput.addEventListener('input', (e) => {
                 const query = e.target.value.toLowerCase();
@@ -873,26 +755,31 @@ signature := hex.EncodeToString(mac.Sum(nil))
                         item.title.toLowerCase().includes(query)
                     );
                     renderGraphsList(filtered);
-                } else if (activeTab === 'trees') {
-                    const filtered = allTrees.filter(tree => 
-                        tree.name.toLowerCase().includes(query)
-                    );
-                    renderTreesList(filtered);
                 }
             });
 
-            // Load visual and tabular data for raw metric
+            // Load visual and tabular data for raw metric (differentiates inbound vs outbound packet color)
             async function loadMetricData() {
                 if (!activeMetric) return;
                 
                 const [file, ds] = activeMetric.split(':');
+                
+                // Color mapping: Green for inbound packets, Blue for outbound packets
+                let color = '#38a169'; // Default Green
+                const lowerDs = ds.toLowerCase();
+                const lowerFile = file.toLowerCase();
+                if (lowerDs.includes('in') || lowerFile.includes('in')) {
+                    color = '#38a169'; // Inbound packets (Green)
+                } else if (lowerDs.includes('out') || lowerFile.includes('out')) {
+                    color = '#3182ce'; // Outbound packets (Blue)
+                }
                 
                 chartContainer.innerHTML = '<div class="spinner"></div>';
                 tableBody.innerHTML = '<tr><td colspan="2" class="no-data">Loading values...</td></tr>';
                 
                 // 1. Load Chart SVG
                 try {
-                    const graphSpec = `DEF:val=${file}:${ds}:AVERAGE LINE1.5:val#38a169:${ds}`;
+                    const graphSpec = `DEF:val=${file}:${ds}:AVERAGE LINE1.5:val${color}:${ds}`;
                     const chartUrl = `${apiBase}/api/v1/graph?start=${activeRange}&imgformat=SVG&graph=${encodeURIComponent(graphSpec)}&title=${encodeURIComponent(file + ' (' + ds + ')')}`;
                     
                     const chartResponse = await fetch(chartUrl);
