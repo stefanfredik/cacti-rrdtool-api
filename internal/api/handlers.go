@@ -10,17 +10,19 @@ import (
 	"github.com/google/shlex"
 )
 
-// APIHandler wraps RRD Client and Cache services.
+// APIHandler wraps RRD Client, Cache, and DB services.
 type APIHandler struct {
 	rrdClient rrd.RRDClient
 	cache     *rrd.MetricsCache
+	dbConn    *rrd.DBConn
 }
 
 // NewAPIHandler creates a new APIHandler.
-func NewAPIHandler(rrdClient rrd.RRDClient, cache *rrd.MetricsCache) *APIHandler {
+func NewAPIHandler(rrdClient rrd.RRDClient, cache *rrd.MetricsCache, dbConn *rrd.DBConn) *APIHandler {
 	return &APIHandler{
 		rrdClient: rrdClient,
 		cache:     cache,
+		dbConn:    dbConn,
 	}
 }
 
@@ -31,14 +33,77 @@ func (h *APIHandler) PingHandler(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write([]byte(`"pong"`))
 }
 
+// MetricDetail holds raw metric strings and enriched Cacti human-readable names.
+type MetricDetail struct {
+	Metric string `json:"metric"`
+	File   string `json:"file"`
+	Ds     string `json:"ds"`
+	Title  string `json:"title"`
+}
+
 // ListMetricsHandler returns available metrics, filtered by optional glob query parameter.
+// Supports detail=true to enrich metrics with Cacti human-readable interface names.
 func (h *APIHandler) ListMetricsHandler(w http.ResponseWriter, r *http.Request) {
 	globPattern := r.URL.Query().Get("glob")
+	detailParam := r.URL.Query().Get("detail")
 	
 	metrics := h.cache.Get(globPattern)
 	
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
+	
+	if detailParam == "true" || detailParam == "on" || detailParam == "1" {
+		var nameMap map[string]string
+		var err error
+		if h.dbConn != nil {
+			nameMap, err = h.dbConn.GetMetricNames()
+			if err != nil {
+				// Fall back to filename-based display titles on DB error
+				nameMap = nil
+			}
+		}
+		
+		var detailList []MetricDetail
+		for _, m := range metrics {
+			parts := strings.Split(m, ":")
+			file := parts[0]
+			ds := ""
+			if len(parts) > 1 {
+				ds = parts[1]
+			}
+			
+			title := ""
+			if nameMap != nil {
+				title = nameMap[file]
+			}
+			
+			// Fallback titles if DB mapping is missing or failed
+			if title == "" {
+				if strings.Contains(file, "traffic") {
+					title = fmt.Sprintf("Localhost - Traffic - eth0 (%s)", ds)
+				} else if strings.Contains(file, "mem") {
+					title = fmt.Sprintf("Localhost - Memory - %s", ds)
+				} else if strings.Contains(file, "cpu") {
+					title = fmt.Sprintf("Localhost - CPU Usage - %s", ds)
+				} else {
+					title = fmt.Sprintf("Localhost - %s (%s)", strings.TrimSuffix(file, ".rrd"), ds)
+				}
+			} else {
+				// Append datasource name to database title for precision
+				title = fmt.Sprintf("%s (%s)", title, ds)
+			}
+			
+			detailList = append(detailList, MetricDetail{
+				Metric: m,
+				File:   file,
+				Ds:     ds,
+				Title:  title,
+			})
+		}
+		_ = json.NewEncoder(w).Encode(detailList)
+		return
+	}
+	
 	_ = json.NewEncoder(w).Encode(metrics)
 }
 

@@ -42,8 +42,16 @@ func main() {
 	cache.Start(context.Background())
 	defer cache.Stop()
 
+	// 3.5 Initialize optional Cacti Database connection
+	dbConn, err := rrd.NewDBConn(cfg.DBUser, cfg.DBPass, cfg.DBHost, cfg.DBPort, cfg.DBName)
+	if err != nil {
+		log.Printf("⚠️  Failed to connect to Cacti DB (running in file-only mode): %s", err)
+	} else if dbConn != nil {
+		defer dbConn.Close()
+	}
+
 	// 4. Create HTTP Handler
-	handler := api.NewAPIHandler(rrdClient, cache)
+	handler := api.NewAPIHandler(rrdClient, cache, dbConn)
 
 	// 5. Create Frontend Static File Handler
 	frontendHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

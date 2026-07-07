@@ -26,7 +26,7 @@ func setupTestServer(cfg *config.Config) (http.Handler, *rrd.MockClient) {
 	cache.Start(context.Background())
 	time.Sleep(50 * time.Millisecond)
 	
-	handler := NewAPIHandler(mockClient, cache)
+	handler := NewAPIHandler(mockClient, cache, nil)
 	router := SetupRouter(cfg, handler, nil)
 	return router, mockClient
 }
@@ -75,6 +75,35 @@ func TestListMetricsHandlerUnauthenticated(t *testing.T) {
 	// MockClient has 4 RRD files, one with 2 DS, so total 5 metrics
 	if len(metrics) != 5 {
 		t.Errorf("Expected 5 metrics, got %d", len(metrics))
+	}
+}
+
+func TestListMetricsHandlerDetailed(t *testing.T) {
+	cfg := &config.Config{}
+	router, _ := setupTestServer(cfg)
+
+	req := httptest.NewRequest("GET", "/api/v1/list_metrics?detail=true", nil)
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("Expected status 200, got %d", w.Code)
+	}
+
+	var details []MetricDetail
+	if err := json.Unmarshal(w.Body.Bytes(), &details); err != nil {
+		t.Fatalf("Failed to decode detailed metrics: %v. Body: %s", err, w.Body.String())
+	}
+
+	if len(details) != 5 {
+		t.Errorf("Expected 5 detailed metrics, got %d", len(details))
+	}
+
+	for _, det := range details {
+		if det.Metric == "" || det.File == "" || det.Ds == "" || det.Title == "" {
+			t.Errorf("MetricDetail fields should not be empty: %+v", det)
+		}
 	}
 }
 

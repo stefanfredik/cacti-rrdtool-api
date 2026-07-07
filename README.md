@@ -224,7 +224,7 @@ Untuk menampilkan data RRD Cacti ke Grafana, gunakan plugin **Infinity** atau **
     Buka Grafana dan instal plugin **JSON API** oleh Marcus Olsson.
 2.  **Tambahkan Data Source**:
     - Pilih **JSON API** sebagai tipe Data Source.
-    - Set **URL** ke alamat API server (e.g., `https://cacti-api.company.local` atau `http://127.0.0.1:9191`).
+    - Set **URL** ke alamat API server (e.g., `https://cacti-api.company.local` or `http://127.0.0.1:9191`).
     - Jika Basic Auth diaktifkan, konfigurasikan username & password di bagian Authentication.
 3.  **Konfigurasikan Query di Panel Dashboard**:
     - Set **Path** ke `/api/v1/xport`.
@@ -235,3 +235,38 @@ Untuk menampilkan data RRD Cacti ke Grafana, gunakan plugin **Infinity** atau **
     - Di bagian **JSON Fields**, petakan data JSON yang diterima:
         - `$.data[*][0]` (Timestamp) -> Petakan sebagai *Time* (format Epoch/seconds).
         - `$.data[*][1][0]` (Value) -> Petakan sebagai *Number* (misal: Memory Usage).
+
+---
+
+## 🗄️ Resolusi Nama Interface dari Database Cacti
+
+Secara default, file RRD hanya menyimpan ID data source internal (e.g. `localhost_traffic_in_4.rrd`). Nama interface yang ramah manusia (seperti `GigabitEthernet0/1` atau `eth0`) disimpan di database MariaDB/MySQL Cacti.
+
+API ini secara opsional dapat tersambung ke database Cacti untuk menerjemahkan nama file RRD ke nama asli interface secara real-time.
+
+### Cara Mengaktifkan:
+Tambahkan kredensial database Cacti Anda ke dalam environment variables saat menjalankan server (atau gunakan CLI flags):
+
+```bash
+export RRD_DB_HOST="127.0.0.1"
+export RRD_DB_PORT="3306"
+export RRD_DB_USER="cactiuser"
+export RRD_DB_PASS="cactipassword"
+export RRD_DB_NAME="cacti"
+```
+
+Jika diaktifkan, Anda dapat memanggil endpoint `/api/v1/list_metrics?detail=true` untuk mendapatkan respons kaya metadata:
+
+```json
+[
+  {
+    "metric": "localhost_traffic_in_4.rrd:traffic_in",
+    "file": "localhost_traffic_in_4.rrd",
+    "ds": "traffic_in",
+    "title": "Localhost - Traffic - eth0 (traffic_in)"
+  }
+]
+```
+
+Dashboard bawaan server (browser di `http://127.0.0.1:9191`) akan otomatis mendeteksi konfigurasi ini dan menampilkan nama antarmuka yang ramah manusia pada daftar metrik di sidebar secara otomatis!
+

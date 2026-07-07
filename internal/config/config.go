@@ -25,6 +25,11 @@ type Config struct {
 	RateLimitRPS         float64       `json:"rate_limit_rps"`
 	RateLimitBurst       int           `json:"rate_limit_burst"`
 	MaxConcurrentRRDTool int           `json:"max_concurrent_rrdtool"`
+	DBHost               string        `json:"db_host"`
+	DBPort               string        `json:"db_port"`
+	DBUser               string        `json:"db_user"`
+	DBPass               string        `json:"db_pass"`
+	DBName               string        `json:"db_name"`
 }
 
 // LoadConfig loads configuration from CLI arguments, environment variables, and optionally a JSON config file.
@@ -39,6 +44,11 @@ func LoadConfig(args []string) (*Config, error) {
 		RateLimitRPS:         20.0,
 		RateLimitBurst:       50,
 		MaxConcurrentRRDTool: 10,
+		DBHost:               "",
+		DBPort:               "3306",
+		DBUser:               "",
+		DBPass:               "",
+		DBName:               "",
 	}
 
 	// CLI Flags using a local FlagSet to avoid global redefinition panics in tests
@@ -56,6 +66,11 @@ func LoadConfig(args []string) (*Config, error) {
 	rateRPS := fs.Float64("rate-rps", 0.0, "Rate limit requests per second (0 to disable)")
 	rateBurst := fs.Int("rate-burst", 0, "Rate limit burst size")
 	maxConns := fs.Int("max-conns", 0, "Maximum concurrent RRDTool CLI processes")
+	dbHost := fs.String("db-host", "", "Cacti DB host (optional)")
+	dbPort := fs.String("db-port", "3306", "Cacti DB port")
+	dbUser := fs.String("db-user", "", "Cacti DB user")
+	dbPass := fs.String("db-pass", "", "Cacti DB password")
+	dbName := fs.String("db-name", "", "Cacti DB name")
 
 	if err := fs.Parse(args); err != nil {
 		return nil, err
@@ -124,6 +139,21 @@ func LoadConfig(args []string) (*Config, error) {
 			cfg.MaxConcurrentRRDTool = i
 		}
 	}
+	if val := os.Getenv("RRD_DB_HOST"); val != "" {
+		cfg.DBHost = val
+	}
+	if val := os.Getenv("RRD_DB_PORT"); val != "" {
+		cfg.DBPort = val
+	}
+	if val := os.Getenv("RRD_DB_USER"); val != "" {
+		cfg.DBUser = val
+	}
+	if val := os.Getenv("RRD_DB_PASS"); val != "" {
+		cfg.DBPass = val
+	}
+	if val := os.Getenv("RRD_DB_NAME"); val != "" {
+		cfg.DBName = val
+	}
 
 	// Override from Flags
 	if *listenAddr != "" {
@@ -161,6 +191,21 @@ func LoadConfig(args []string) (*Config, error) {
 	}
 	if *maxConns > 0 {
 		cfg.MaxConcurrentRRDTool = *maxConns
+	}
+	if *dbHost != "" {
+		cfg.DBHost = *dbHost
+	}
+	if *dbPort != "" && *dbPort != "3306" {
+		cfg.DBPort = *dbPort
+	}
+	if *dbUser != "" {
+		cfg.DBUser = *dbUser
+	}
+	if *dbPass != "" {
+		cfg.DBPass = *dbPass
+	}
+	if *dbName != "" {
+		cfg.DBName = *dbName
 	}
 
 	// Automatic Demo mode if rrdtool is not installed and demo was not explicitly disabled

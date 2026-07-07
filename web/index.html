@@ -536,7 +536,7 @@ signature := hex.EncodeToString(mac.Sum(nil))
             // Fetch metrics list
             async function fetchMetrics() {
                 try {
-                    const response = await fetch(`${apiBase}/api/v1/list_metrics`);
+                    const response = await fetch(`${apiBase}/api/v1/list_metrics?detail=true`);
                     if (!response.ok) throw new Error('Failed to fetch metrics');
                     allMetrics = await response.json();
                     renderMetricsList(allMetrics);
@@ -553,16 +553,19 @@ signature := hex.EncodeToString(mac.Sum(nil))
                 }
                 
                 metricsList.innerHTML = '';
-                metrics.forEach(metric => {
-                    const [file, ds] = metric.split(':');
+                metrics.forEach(item => {
+                    const metric = item.metric;
+                    const file = item.file;
+                    const ds = item.ds;
+                    const title = item.title;
                     
                     const button = document.createElement('button');
                     button.className = 'metric-item';
                     if (activeMetric === metric) button.classList.add('active');
                     
                     button.innerHTML = `
-                        <div class="metric-name" title="${file}">${file}</div>
-                        <div class="metric-ds">DS: ${ds}</div>
+                        <div class="metric-name" title="${title}">${title}</div>
+                        <div class="metric-ds" style="font-size:0.75rem; color:#a0aec0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${file} [${ds}]</div>
                     `;
                     
                     button.addEventListener('click', () => {
@@ -571,8 +574,8 @@ signature := hex.EncodeToString(mac.Sum(nil))
                         button.classList.add('active');
                         
                         // Update headers
-                        activeTitle.innerText = file;
-                        activeDetails.innerText = `Data Source: ${ds} | Interval: 300s`;
+                        activeTitle.innerText = title;
+                        activeDetails.innerText = `File: ${file} | DS: ${ds} | Interval: 300s`;
                         
                         loadMetricData();
                     });
@@ -584,7 +587,10 @@ signature := hex.EncodeToString(mac.Sum(nil))
             // Search filtering
             searchInput.addEventListener('input', (e) => {
                 const query = e.target.value.toLowerCase();
-                const filtered = allMetrics.filter(m => m.toLowerCase().includes(query));
+                const filtered = allMetrics.filter(item => 
+                    item.title.toLowerCase().includes(query) || 
+                    item.metric.toLowerCase().includes(query)
+                );
                 renderMetricsList(filtered);
             });
 
